@@ -1,129 +1,164 @@
 # ADB Wi-Fi Connect Helper
 
-一个 macOS 小工具，用来修复 Android Studio 无线调试里很常见的卡住场景：
+[简体中文](README.zh-CN.md)
 
-- 手机扫码后一直显示“正在配对”
-- Android Studio 的 `Pair devices using Wi-Fi` 没反应
-- `adb pair` 已经成功，但 Android Studio 还是不显示手机
-- 明明在同一个 Wi-Fi，APK 还是安装不到真机上
+A small macOS helper for the Android wireless-debugging state where pairing
+succeeds, but Android Studio still cannot see or deploy to the device.
 
-这个工具会自动扫描 Android 设备广播出来的真正无线调试连接端口，然后执行 `adb connect`。
+The helper discovers the device's current `_adb-tls-connect._tcp` service and
+runs `adb connect` against the advertised connection port.
 
-## 为什么需要它
+## Why this helper exists
 
-Android 无线调试其实分两步：
+Android wireless debugging has two separate steps:
 
 ```text
-adb pair    只负责授权这台电脑
-adb connect 才是真正连接手机、让 Android Studio 可以安装 APK
+adb pair      authorizes the computer
+adb connect   connects the device for installs and debugging
 ```
 
-很多人卡住，是因为把“配对端口”当成了“连接端口”。
+The pairing-code screen and the main Wireless debugging screen usually expose
+different ports. A successful command such as:
 
 ```bash
 adb pair 192.168.1.20:36451
 ```
 
-上面的 `36451` 通常只是配对端口，用完就关。真正安装应用需要另一个端口：
+does not mean that `192.168.1.20:36451` is the port Android Studio should use.
+The actual connection may be advertised as, for example:
 
 ```bash
 adb connect 192.168.1.20:45109
 ```
 
-这个工具就是帮你自动找到后面这个端口。
+This helper finds that second port automatically.
 
-## 系统要求
+## Requirements
 
 - macOS
-- Android Studio 或 Android SDK Platform-Tools
-- 手机 Android 11+
-- 手机和电脑在同一个局域网
-- 手机已开启：开发者选项 > 无线调试
+- Android Studio or Android SDK Platform-Tools (`adb`)
+- Android 11 or newer
+- The Mac and Android device on the same local network
+- **Developer options > Wireless debugging** enabled on the device
 
-## 使用方法
+## Install
 
-下载脚本后赋予执行权限：
+### Download the v0.1.0 release
 
 ```bash
+curl --fail --location --output adb-wifi-connect.command \
+  https://github.com/morning-verlu/adb-wifi-connect-helper/releases/download/v0.1.0/adb-wifi-connect.command
 chmod +x adb-wifi-connect.command
-```
-
-然后双击 `adb-wifi-connect.command`，或者在终端运行：
-
-```bash
 ./adb-wifi-connect.command
 ```
 
-脚本会自动：
+### Download the latest source
 
-1. 找到本机 `adb`
-2. 扫描 `_adb-tls-connect._tcp`
-3. 解析手机当前连接端口
-4. 执行 `adb connect`
-5. 显示 `adb devices -l`
+```bash
+curl --fail --location --output adb-wifi-connect.command \
+  https://raw.githubusercontent.com/morning-verlu/adb-wifi-connect-helper/main/adb-wifi-connect.command
+chmod +x adb-wifi-connect.command
+./adb-wifi-connect.command
+```
 
-看到类似下面这样就成功了：
+### Clone the repository
+
+```bash
+git clone https://github.com/morning-verlu/adb-wifi-connect-helper.git
+cd adb-wifi-connect-helper
+chmod +x adb-wifi-connect.command
+./adb-wifi-connect.command
+```
+
+You can also double-click `adb-wifi-connect.command` in Finder after making it
+executable.
+
+## Usage
+
+For a computer that is already paired with the phone, run:
+
+```bash
+./adb-wifi-connect.command --skip-pair
+```
+
+The helper will:
+
+1. Locate `adb`.
+2. Browse for `_adb-tls-connect._tcp` services with macOS `dns-sd`.
+3. Resolve the device's current connection port.
+4. Run `adb connect` for each discovered target.
+5. Print `adb devices -l`.
+
+A connected device looks similar to:
 
 ```text
 192.168.1.20:45109 device product:PHY110 model:PHY110
 ```
 
-## 第一次配对
+### Pair for the first time
 
-如果这台电脑还没和手机配对：
-
-1. 手机打开：开发者选项 > 无线调试 > 使用配对码配对设备
-2. 运行：
+On the phone, open **Developer options > Wireless debugging > Pair device with
+pairing code**, then run:
 
 ```bash
 ./adb-wifi-connect.command --pair 192.168.1.20:36451 868723
 ```
 
-配对成功后，把手机退回“无线调试”主页面，脚本会继续自动连接真正端口。
+After pairing, return to the main Wireless debugging screen. The helper will
+continue by discovering the separate connection port.
 
-## 已知连接端口
+### Connect to a known port
 
-如果你已经知道无线调试主页面上的 `IP 地址和端口`：
+If the main Wireless debugging screen already shows the connection address:
 
 ```bash
 ./adb-wifi-connect.command --connect 192.168.1.20:45109
 ```
 
-## 常用选项
-
-```bash
-./adb-wifi-connect.command --skip-pair
-./adb-wifi-connect.command --restart-adb
-./adb-wifi-connect.command --seconds 8
-```
-
-- `--skip-pair`：跳过配对提示，只自动扫描连接端口
-- `--restart-adb`：先重启 adb server
-- `--seconds N`：增加扫描时间，网络慢时有用
-
-## Android Studio 仍不显示怎么办
-
-只要 `adb devices -l` 里已经有：
+### Options
 
 ```text
-192.168.x.x:xxxxx device
+--pair IP:PORT [CODE]   Pair with the phone pairing-code page first.
+--connect IP:PORT       Connect to a known wireless-debugging port.
+--skip-pair             Do not ask for pairing information.
+--restart-adb           Restart the adb server before connecting.
+--seconds N             Scan for N seconds; N must be a positive integer.
+-y, --yes               Do not prompt for input.
+-h, --help              Show help.
 ```
 
-说明手机已经连接成功。此时：
-
-1. 关闭 Android Studio 的无线配对弹窗
-2. 刷新设备下拉框
-3. 还不显示就重启 Android Studio
-4. 重新运行本工具
-
-## 原理
-
-Android 无线调试会通过 Bonjour/mDNS 广播 `_adb-tls-connect._tcp` 服务。脚本使用 macOS 自带的 `dns-sd` 找到服务，再解析出当前端口，最后调用：
+For example, increase the scan window on a slow network:
 
 ```bash
-adb connect IP:PORT
+./adb-wifi-connect.command --seconds 8 --skip-pair
 ```
+
+## Troubleshooting
+
+If `adb devices -l` shows an entry ending in `device`, the connection is ready
+even if Android Studio has not refreshed yet. Close the Wi-Fi pairing dialog,
+refresh the device selector, and restart Android Studio if necessary.
+
+If no target is found:
+
+- Keep the phone unlocked on the main Wireless debugging screen.
+- Confirm that the phone and Mac are on the same network.
+- Disable client isolation or guest-network isolation on the access point.
+- Retry with a longer scan, such as `--seconds 8`.
+- Use `--connect IP:PORT` with the address shown on the phone.
+
+## Development and verification
+
+```bash
+bash -n adb-wifi-connect.command
+bash tests/test.sh
+shellcheck --shell=bash adb-wifi-connect.command tests/test.sh
+```
+
+CI checks shell syntax, help output, invalid `--seconds` values, and ShellCheck.
+The full discovery and connection flow requires macOS, Bonjour/mDNS, and a real
+Android device, so that path is not exercised by CI.
 
 ## License
 
-MIT
+[MIT](LICENSE)

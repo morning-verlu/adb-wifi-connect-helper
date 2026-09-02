@@ -26,7 +26,7 @@ Options:
   --connect IP:PORT       Connect to a known wireless debugging connect port.
   --skip-pair             Do not ask for pairing information.
   --restart-adb           Run adb kill-server before starting.
-  --seconds N             mDNS scan duration. Default: 4.
+  --seconds N             mDNS scan duration; N must be positive. Default: 4.
   -y, --yes               Non-interactive mode. Do not prompt.
   -h, --help              Show this help.
 
@@ -47,6 +47,14 @@ warn() {
 die() {
   printf '\033[1;31m%s\033[0m\n' "$*" >&2
   exit 1
+}
+
+is_positive_integer() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+    *[1-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 need_cmd() {
@@ -228,6 +236,8 @@ prompt_manual_connect() {
   connect_target "$target"
 }
 
+# ShellCheck cannot see that this function is invoked indirectly by the EXIT trap.
+# shellcheck disable=SC2317
 cleanup() {
   if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
     rm -rf "$TMP_DIR"
@@ -284,6 +294,8 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+is_positive_integer "$DISCOVER_SECONDS" || die "--seconds must be a positive integer."
 
 ADB=$(find_adb) || die "Could not find adb. Install Android Studio SDK Platform-Tools first."
 need_cmd dns-sd

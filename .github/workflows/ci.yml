@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Check Bash syntax
+        run: bash -n adb-wifi-connect.command tests/test.sh
+
+      - name: Test help and argument validation
+        run: bash tests/test.sh
+
+      - name: Run ShellCheck
+        run: shellcheck --shell=bash adb-wifi-connect.command tests/test.sh

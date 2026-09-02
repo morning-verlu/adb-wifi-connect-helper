@@ -236,6 +236,8 @@ prompt_manual_connect() {
   connect_target "$target"
 }
 
+# ShellCheck cannot see that this function is invoked indirectly by the EXIT trap.
+# shellcheck disable=SC2317
 cleanup() {
   if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
     rm -rf "$TMP_DIR"
